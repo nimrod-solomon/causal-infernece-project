@@ -71,7 +71,7 @@ def ATE_with_T_learner(data, regressor0, regressor1, treatment_col='TREATMENT', 
     return np.mean(treatment_diffs)
 
 
-def ATE_with_matching(data, n_neighbors, treatment_col='TREATMENT', outcome_col='OUTCOME'):
+def _ATE_with_matching(data, n_neighbors, treatment_col='TREATMENT', outcome_col='OUTCOME'):
     """
     Calculate the Average Treatment Effect, using Matching approach.
     :param data: Pandas.Dataframe
@@ -139,3 +139,54 @@ def ATE_with_matching(data, n_neighbors, treatment_col='TREATMENT', outcome_col=
     prop_t1 = len(data[data[treatment_col] == 1]) / len(data)
 
     return cate0 * prop_t0 + cate1 * prop_t1
+
+
+def ATE_with_matching(data, n_neighbors, treatment_col='TREATMENT', outcome_col='OUTCOME'):
+    """
+    Calculate the Average Treatment Effect, using Matching approach.
+    :param data: Pandas.DataFrame
+    :param n_neighbors: number of nearest counterfactual neighbor of each sample in treatment group
+    :param treatment_col: name of treatment column
+    :param outcome_col: name of outcome column
+    :return: ATE score
+    """
+
+    # Separate the treatment and control groups
+    treatment_group = data[data[treatment_col] == 1]
+    control_group = data[data[treatment_col] == 0]
+
+    # Extract the features for matching
+    features = data.drop(columns=[treatment_col, outcome_col])
+
+    # Fit the nearest neighbors model on the control group
+    nn_control = NearestNeighbors(n_neighbors=n_neighbors)
+    nn_control.fit(control_group[features.columns])
+
+    # Find the nearest neighbors in the control group for each treated unit
+    distances_control, indices_control = nn_control.kneighbors(treatment_group[features.columns])
+
+    # Calculate the average outcome for the matched control units
+    matched_outcomes_control = control_group.iloc[indices_control.flatten()][outcome_col].values.reshape(-1, n_neighbors)
+    avg_matched_outcomes_control = matched_outcomes_control.mean(axis=1)
+
+    # Fit the nearest neighbors model on the treatment group
+    nn_treatment = NearestNeighbors(n_neighbors=n_neighbors)
+    nn_treatment.fit(treatment_group[features.columns])
+
+    # Find the nearest neighbors in the treatment group for each control unit
+    distances_treatment, indices_treatment = nn_treatment.kneighbors(control_group[features.columns])
+
+    # Calculate the average outcome for the matched treatment units
+    matched_outcomes_treatment = treatment_group.iloc[indices_treatment.flatten()][outcome_col].values.reshape(-1, n_neighbors)
+    avg_matched_outcomes_treatment = matched_outcomes_treatment.mean(axis=1)
+
+    # Calculate the ATE
+    ATE_treatment = treatment_group[outcome_col].mean() - avg_matched_outcomes_control.mean()
+    ATE_control = avg_matched_outcomes_treatment.mean() - control_group[outcome_col].mean()
+
+    # Calculate the weighted average of the ATEs
+    n_treatment = len(treatment_group)
+    n_control = len(control_group)
+    weighted_ATE = (ATE_treatment * n_treatment + ATE_control * n_control) / (n_treatment + n_control)
+
+    return weighted_ATE
