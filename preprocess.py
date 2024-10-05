@@ -2,8 +2,21 @@ import pandas as pd
 from folktables import ACSDataSource, generate_categories, BasicProblem
 
 
+# todo document this file
+
 def load_acs_dataset(survey_year, states=None, horizon='1-Year', survey='person', download=False, density=1, random_seed=1):
     """ load the data from the folktables API """
+
+    def _to_dictionary(var_definitions):
+        """ Construct variable explanations dictionary """
+        var_exp_df = var_definitions.copy()
+        var_exp_df.columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G']  # dummy names
+        var_exp_df = var_exp_df[var_exp_df['A'] == 'NAME'][['B', 'E']]
+        var_exp_dict = {}
+        for _, row in var_exp_df.iterrows():
+            var_exp_dict[row['B']] = row['E']
+        return var_exp_dict
+
     # load the data
     data_source = ACSDataSource(survey_year=survey_year, horizon=horizon, survey=survey)
     data = data_source.get_data(states=states, download=download, density=density, join_household=True, random_seed=random_seed)
@@ -15,17 +28,6 @@ def load_acs_dataset(survey_year, states=None, horizon='1-Year', survey='person'
     return data, definitions_dict, categories
 
 
-def _to_dictionary(var_definitions):
-    """ Construct variable explanations dictionary """
-    var_exp_df = var_definitions.copy()
-    var_exp_df.columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G']  # dummy names
-    var_exp_df = var_exp_df[var_exp_df['A'] == 'NAME'][['B', 'E']]
-    var_exp_dict = {}
-    for _, row in var_exp_df.iterrows():
-        var_exp_dict[row['B']] = row['E']
-    return var_exp_dict
-
-
 def preprocess(data, categories, treatment_definition_func, outcome_definition_func, features_to_select):
     """ Preprocess the data """
 
@@ -35,7 +37,6 @@ def preprocess(data, categories, treatment_definition_func, outcome_definition_f
             cols[cols[cols == dup].index.values.tolist()] = [dup + '_' + str(i) if i != 0 else dup for i in range(sum(cols == dup))]
         df.columns = cols
         return df
-
 
     # define the treatment and outcome. MIL == military service. COW == class of worker
     data['TREATMENT'] = data.apply(treatment_definition_func, axis=1)

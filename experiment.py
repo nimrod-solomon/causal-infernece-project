@@ -8,29 +8,34 @@ import pandas as pd
 import warnings
 warnings.filterwarnings('ignore')
 
-
+# Constants
 SELECTED_FEATURES = pd.read_csv("./supplementary materials/selected variables.csv")["code"].to_list()
 N_BOOTSTRAP_TRIALS = 3
 DENSITY_PER_TRIAL = 0.0001
 TREATMENT_DEFINITION = lambda unit: 1.0 if unit['MIL'] in [2.0, 3.0] else 0.0
 OUTCOME_DEFINITION = lambda unit: 1.0 if unit['COW'] in [3.0, 4.0, 5.0] else 0.0
 
-
+# Run Experiment
 if __name__ == '__main__':
     ate_s_learner_list = []
     ate_t_learner_list = []
     ate_matching_list = []
+
+    # todo change to while that captures iterations where the sample causes errors
     for i in range(N_BOOTSTRAP_TRIALS):
         start_time = time.time()
 
+        # Sample small portion of the data
         raw_data, variables_definitions, answers_parsing = load_acs_dataset(survey_year='2022', density=DENSITY_PER_TRIAL, random_seed=i)
         processed_df = preprocess(data=raw_data, categories=answers_parsing, treatment_definition_func=TREATMENT_DEFINITION,
                                   outcome_definition_func=OUTCOME_DEFINITION, features_to_select=SELECTED_FEATURES)
 
+        # Create regressors for S\T Learners
         regressor = RandomForestRegressor()
         regressor0 = LogisticRegression()
         regressor1 = LogisticRegression()
 
+        # Calculate ATE in several ways
         print(f"Trial No. {i+1}:", end="\t")
         ate_s_learner = ATE_with_S_learner(data=processed_df, regressor=regressor)
         print(f"ATE with S-Learner: {ate_s_learner}", end="\t")
@@ -46,6 +51,7 @@ if __name__ == '__main__':
         iteration_time = end_time - start_time
         print(f"Iteration Time: {iteration_time:.2f} seconds")
 
+    # Print summary of experiment
     print()
     print("Summary:")
     print("S-Learner Method:")
@@ -68,4 +74,3 @@ if __name__ == '__main__':
     quantile_05 = np.quantile(ate_matching_nparray, 0.05)
     quantile_95 = np.quantile(ate_matching_nparray, 0.95)
     print(f"Avg ATE over {N_BOOTSTRAP_TRIALS} trials: {mean_value}. Confidence Interval: [{quantile_05}, {quantile_95}]")
-
