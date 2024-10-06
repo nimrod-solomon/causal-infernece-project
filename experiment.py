@@ -12,8 +12,23 @@ warnings.filterwarnings('ignore')
 SELECTED_FEATURES = pd.read_csv("./supplementary materials/selected variables.csv")["code"].to_list()
 N_BOOTSTRAP_TRIALS = 10
 DENSITY_PER_TRIAL = 0.0001
-TREATMENT_DEFINITION = lambda unit: 1.0 if unit['MIL'] in [2.0, 3.0] else 0.0
+
+# Served in the past but not now, reserves not included as service
+# MIL=2.0: On active duty in the past, but not now
+# MIL=3.0: Only on active duty for training in Reserves/National Guard'
+TREATMENT_DEFINITION = lambda unit: 1.0 if unit['MIL'] in [2.0, 3.0] and unit['MLPA'] == 1.0 else 0.0
+# COW = 3.0: Local government employee (city, county, etc.)
+# COW = 4.0: State government employee
+# COW = 5.0: Federal government employee
 OUTCOME_DEFINITION = lambda unit: 1.0 if unit['COW'] in [3.0, 4.0, 5.0] else 0.0
+
+ALL_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI',
+              'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI',
+              'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC',
+              'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT',
+              'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'PR']
+
+DESIGNATED_STATES = ALL_STATES
 
 
 # Run Experiment
@@ -28,8 +43,11 @@ if __name__ == '__main__':
         start_time = time.time()
 
         # Sample small portion of the data
-        raw_data, variables_definitions, answers_parsing = load_acs_dataset(survey_year='2022', density=DENSITY_PER_TRIAL, random_seed=sample_seed)
-        processed_df = preprocess(data=raw_data, categories=answers_parsing, treatment_definition_func=TREATMENT_DEFINITION,
+        raw_data, variables_definitions, answers_parsing = load_acs_dataset(survey_year='2022',
+                                                                            density=DENSITY_PER_TRIAL,
+                                                                            random_seed=sample_seed)
+        processed_df = preprocess(data=raw_data, categories=answers_parsing,
+                                  treatment_definition_func=TREATMENT_DEFINITION,
                                   outcome_definition_func=OUTCOME_DEFINITION, features_to_select=SELECTED_FEATURES)
 
         # Create regressors for S\T Learners
