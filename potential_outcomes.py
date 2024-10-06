@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import minmax_scale
 from sklearn.neighbors import NearestNeighbors
 
 
@@ -13,22 +12,35 @@ def ATE_with_S_learner(data, regressor, treatment_col='TREATMENT', outcome_col='
     :param outcome_col: name of outcome column
     :return: ATE score
     """
-    # todo maybe needs to be like the t learner
-    # Fit a model y=~f(x,t) , with t as a feature
+    # Fit a model y=~f(x, t), t is a feature in the models
+    XT = data.drop(columns=[outcome_col], inplace=False)
     y = data[outcome_col]
-    X = data.drop(columns=[outcome_col], inplace=False)
-    fitted_regressor = regressor.fit(X, y)
+    fitted_regressor = regressor.fit(XT, y)
 
-    # Predict f(x,1) - f(x,0)
-    X_t1 = X.copy()
-    X_t1[treatment_col] = 1
-    predictions_t1 = fitted_regressor.predict(X_t1)
-    X_t0 = X.copy()
-    X_t0[treatment_col] = 0
-    predictions_t0 = fitted_regressor.predict(X_t0)
+    # Create a storage for the potential outcomes
+    potential_outcomes_df = pd.DataFrame(0, index=range(len(data)), columns=[treatment_col, outcome_col, "y0_hat", "y1_hat"])
+    potential_outcomes_df[treatment_col] = data[treatment_col]
+    potential_outcomes_df[outcome_col] = data[outcome_col]
+
+    # create data copies as if the treatment was 0 or 1
+    data_t0 = data.copy()
+    data_t0[treatment_col] = 0
+    data_t1 = data.copy()
+    data_t1[treatment_col] = 1
+
+    # Fill the potential outcomes with the observed value for the true treatment
+    # and the prediction of the outcome for the opposite treatment
+    potential_outcomes_df["y0_hat"] = fitted_regressor.predict(data_t0.drop(columns=[outcome_col]))
+    potential_outcomes_df["y1_hat"] = fitted_regressor.predict(data_t1.drop(columns=[outcome_col]))
+    for index, row in potential_outcomes_df.iterrows():
+        if row[treatment_col] == 0:
+            row["y0_hat"] = row['OUTCOME']
+        else:  # row[treatment_col] == 1
+            row["y1_hat"] = row['OUTCOME']
 
     # Calculate estimator for ATE
-    return np.mean(predictions_t1 - predictions_t0)
+    outcomes_diffs = potential_outcomes_df["y1_hat"].to_numpy() - potential_outcomes_df["y0_hat"].to_numpy()
+    return np.mean(outcomes_diffs)
 
 
 def ATE_with_T_learner(data, regressor0, regressor1, treatment_col='TREATMENT', outcome_col='OUTCOME'):

@@ -2,13 +2,32 @@ import pandas as pd
 from folktables import ACSDataSource, generate_categories, BasicProblem
 
 
-# todo document this file
-
 def load_acs_dataset(survey_year, states=None, horizon='1-Year', survey='person', download=False, density=1, random_seed=1):
-    """ load the data from the folktables API """
+    """
+    Loads data from the American Community Survey (ACS) using the Folktables API.
+
+    :param survey_year: The year of the ACS survey to load data from (int).
+    :param states: A list of states to include in the data. If None, data from all states is loaded (list, optional).
+    :param horizon: The time horizon of the ACS data (e.g., '1-Year', '3-Year') (str, optional).
+    :param survey: The type of ACS survey (e.g., 'person', 'household') (str, optional).
+    :param download: A boolean indicating whether to download the data locally (bool, optional).
+    :param density: The density of the ACS data (e.g., 1, 2, 3) (int, optional).
+    :param random_seed: A random seed used for sampling data if `density` is less than 1 (int, optional).
+
+    :returns: tuple: A tuple containing:
+            - data (pd.DataFrame): A Pandas DataFrame containing the loaded ACS data.
+            - definitions_dict (dict): A dictionary mapping variable names to their definitions.
+            - categories (list): A list of categories associated with the variables in the data.
+    """
 
     def _to_dictionary(var_definitions):
-        """ Construct variable explanations dictionary """
+        """
+        Constructs a dictionary mapping variable names to their definitions.
+
+        :param: var_definitions: A DataFrame containing the variable definitions (pd.DataFrame).
+
+        :returns: A dictionary mapping variable names to their definitions (dict).
+        """
         var_exp_df = var_definitions.copy()
         var_exp_df.columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G']  # dummy names
         var_exp_df = var_exp_df[var_exp_df['A'] == 'NAME'][['B', 'E']]
@@ -29,7 +48,17 @@ def load_acs_dataset(survey_year, states=None, horizon='1-Year', survey='person'
 
 
 def preprocess(data, categories, treatment_definition_func, outcome_definition_func, features_to_select):
-    """ Preprocess the data """
+    """
+    Preprocesses the data for machine learning analysis.
+
+    :param data: A pandas DataFrame containing the raw data.
+    :param categories: A list of column names representing categorical features.
+    :param treatment_definition_func: A function that defines the treatment variable based on the data.
+    :param outcome_definition_func: A function that defines the outcome variable based on the data.
+    :param features_to_select: A list of column names specifying the features to be included in the analysis.
+
+    :returns: A preprocessed pandas DataFrame ready for machine learning.
+    """
 
     def _rename_duplicate_columns(df):
         cols = pd.Series(df.columns)
@@ -38,18 +67,24 @@ def preprocess(data, categories, treatment_definition_func, outcome_definition_f
         df.columns = cols
         return df
 
-    # define the treatment and outcome. MIL == military service. COW == class of worker
+    # Define the treatment and outcome variables
     data['TREATMENT'] = data.apply(treatment_definition_func, axis=1)
     data['OUTCOME'] = data.apply(outcome_definition_func, axis=1)
+
+    # Select the specified features
     features_to_select.extend(['TREATMENT', 'OUTCOME'])
     data_filtered_cols = data[features_to_select]
-
     features = list(set(data_filtered_cols.columns) - {'OUTCOME'})
+
+    # Create a BasicProblem instance
     basic_problem = BasicProblem(features=features, target='OUTCOME')
+
+    # Convert the data to pandas DataFrames, data types to float
     X_df, y_df, _ = basic_problem.df_to_pandas(df=data_filtered_cols, categories=categories, dummies=True)
     Xy_df = pd.concat([X_df, y_df], axis=1)
     Xy_df = Xy_df.apply(lambda col: col.astype(float))
 
+    # Rename and delete duplicate columns, handle missing values
     Xy_df = _rename_duplicate_columns(Xy_df)
 
     for col in Xy_df.columns:

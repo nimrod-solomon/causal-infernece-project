@@ -10,10 +10,11 @@ warnings.filterwarnings('ignore')
 
 # Constants
 SELECTED_FEATURES = pd.read_csv("./supplementary materials/selected variables.csv")["code"].to_list()
-N_BOOTSTRAP_TRIALS = 3
+N_BOOTSTRAP_TRIALS = 10
 DENSITY_PER_TRIAL = 0.0001
 TREATMENT_DEFINITION = lambda unit: 1.0 if unit['MIL'] in [2.0, 3.0] else 0.0
 OUTCOME_DEFINITION = lambda unit: 1.0 if unit['COW'] in [3.0, 4.0, 5.0] else 0.0
+
 
 # Run Experiment
 if __name__ == '__main__':
@@ -21,35 +22,46 @@ if __name__ == '__main__':
     ate_t_learner_list = []
     ate_matching_list = []
 
-    # todo change to while that captures iterations where the sample causes errors
-    for i in range(N_BOOTSTRAP_TRIALS):
+    i = 0  # iteration number (updates after each successful iteration)
+    sample_seed = 0  # another seed for the sample (updates after each iteration)
+    while i < N_BOOTSTRAP_TRIALS:
         start_time = time.time()
 
         # Sample small portion of the data
-        raw_data, variables_definitions, answers_parsing = load_acs_dataset(survey_year='2022', density=DENSITY_PER_TRIAL, random_seed=i)
+        raw_data, variables_definitions, answers_parsing = load_acs_dataset(survey_year='2022', density=DENSITY_PER_TRIAL, random_seed=sample_seed)
         processed_df = preprocess(data=raw_data, categories=answers_parsing, treatment_definition_func=TREATMENT_DEFINITION,
                                   outcome_definition_func=OUTCOME_DEFINITION, features_to_select=SELECTED_FEATURES)
 
         # Create regressors for S\T Learners
-        regressor = RandomForestRegressor()
-        regressor0 = LogisticRegression()
-        regressor1 = LogisticRegression()
+        regressor = RandomForestRegressor(random_state=i)
+        regressor0 = LogisticRegression(random_state=i)
+        regressor1 = LogisticRegression(random_state=i)
 
-        # Calculate ATE in several ways
-        print(f"Trial No. {i+1}:", end="\t")
-        ate_s_learner = ATE_with_S_learner(data=processed_df, regressor=regressor)
-        print(f"ATE with S-Learner: {ate_s_learner}", end="\t")
-        ate_t_learner = ATE_with_T_learner(data=processed_df, regressor0=regressor0, regressor1=regressor1)
-        print(f"ATE with T-Learner: {ate_t_learner}", end="\t")
-        ate_matching = ATE_with_matching(data=processed_df, n_neighbors=1)
-        print(f"ATE with Matching: {ate_matching}", end="\t")
-        ate_s_learner_list.append(ate_s_learner)
-        ate_t_learner_list.append(ate_t_learner)
-        ate_matching_list.append(ate_matching)
+        try:
+            # Calculate ATE in several ways
+            ate_s_learner = ATE_with_S_learner(data=processed_df, regressor=regressor)
+            ate_t_learner = ATE_with_T_learner(data=processed_df, regressor0=regressor0, regressor1=regressor1)
+            ate_matching = ATE_with_matching(data=processed_df, n_neighbors=1)
 
-        end_time = time.time()
-        iteration_time = end_time - start_time
-        print(f"Iteration Time: {iteration_time:.2f} seconds")
+        except ValueError:  # it means the sample doesnt contain two classes, only one
+            continue  # skip this sample
+
+        else:  # print ans save the ATEs
+            print(f"Trial No. {i+1}:", end="\t")
+            print(f"ATE with S-Learner: {ate_s_learner}", end="\t")
+            print(f"ATE with T-Learner: {ate_t_learner}", end="\t")
+            print(f"ATE with Matching: {ate_matching}", end="\t")
+            ate_s_learner_list.append(ate_s_learner)
+            ate_t_learner_list.append(ate_t_learner)
+            ate_matching_list.append(ate_matching)
+
+            end_time = time.time()
+            iteration_time = end_time - start_time
+            print(f"Iteration Time: {iteration_time:.2f} seconds")
+            i += 1
+
+        finally:
+            sample_seed += 1
 
     # Print summary of experiment
     print()
