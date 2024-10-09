@@ -48,7 +48,7 @@ if __name__ == '__main__':
                                                                             states=DESIGNATED_STATES,
                                                                             random_seed=sample_seed,
                                                                             download=True)
-        
+
         processed_df = preprocess(data=raw_data, categories=answers_parsing,
                                   treatment_definition_func=TREATMENT_DEFINITION,
                                   outcome_definition_func=OUTCOME_DEFINITION, features_to_select=SELECTED_FEATURES)
