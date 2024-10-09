@@ -10,8 +10,8 @@ warnings.filterwarnings('ignore')
 
 # Constants
 SELECTED_FEATURES = pd.read_csv("./supplementary materials/selected variables.csv")["code"].to_list()
-N_BOOTSTRAP_TRIALS = 10
-DENSITY_PER_TRIAL = 0.0001
+N_BOOTSTRAP_TRIALS = 100
+DENSITY_PER_TRIAL = 0.001
 
 # Served in the past but not now, reserves not included as service
 # MIL=2.0: On active duty in the past, but not now
@@ -45,6 +45,7 @@ if __name__ == '__main__':
         # Sample small portion of the data
         raw_data, variables_definitions, answers_parsing = load_acs_dataset(survey_year='2022',
                                                                             density=DENSITY_PER_TRIAL,
+                                                                            states=DESIGNATED_STATES,
                                                                             random_seed=sample_seed)
         processed_df = preprocess(data=raw_data, categories=answers_parsing,
                                   treatment_definition_func=TREATMENT_DEFINITION,
