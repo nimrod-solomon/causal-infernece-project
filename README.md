@@ -18,7 +18,8 @@ veterans and proposes avenues for further research to enrich the comprehension o
 
 
 ##### How to run the code
-We managed to run the code in this repository on a virtual machine using the following sequence of commands:
+After cloning this repo to a virtual machine, We managed to run the code 
+using the following sequence of terminal commands:
 
 ```shell
 conda create -n <YOUR_ENV_NAME> python=3.9
