@@ -1,6 +1,0 @@
-conda create -n new_env python=3.9
-conda activate new_env
-conda install scipy scikit-learn pandas
-conda update --all
-conda install -c conda-forge libstdcxx-ng
-pip install folktables
